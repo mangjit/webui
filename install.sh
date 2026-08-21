@@ -194,17 +194,53 @@ if [[ "${OWI_RUN_UPDATE:-0}" == "1" ]]; then
   run_update
 fi
 
+# --- Phase 8: persist control tools inside the rootfs -----------------------------------
+# When launched via termux-bootstrap.sh, the project folder is only bind-mounted
+# into the container for the duration of that login session. Once it exits,
+# /root/openwebui-autoinstaller disappears, so 'openwebui-ctl' would be missing
+# on later logins. Copy the tools into the persistent install dir and add
+# PATH-wide wrappers so control works from any fresh login.
+persist_tools() {
+  local dst="$OWI_INSTALL_DIR/tools"
+  if is_dry_run; then
+    dry_msg "copy project scripts -> $dst  (+ /usr/local/bin wrappers)"
+    return 0
+  fi
+  ensure_dir "$dst"
+  if [[ -f "$OWI_ROOT_DIR/install.sh" ]]; then
+    cp -r "$OWI_ROOT_DIR/install.sh" "$OWI_ROOT_DIR/update.sh" "$OWI_ROOT_DIR/openwebui-ctl" \
+          "$OWI_ROOT_DIR/termux-bootstrap.sh" "$OWI_ROOT_DIR/conf" "$OWI_ROOT_DIR/lib" "$dst/" 2>/dev/null \
+      || ow_warn "could not persist control tools to $dst"
+  fi
+  if [[ -w /usr/local/bin ]]; then
+    cat > /usr/local/bin/openwebui-ctl <<EOF
+#!/bin/bash
+exec bash "$dst/openwebui-ctl" "\$@"
+EOF
+    cat > /usr/local/bin/webui-update <<EOF
+#!/bin/bash
+exec bash "$dst/update.sh" "\$@"
+EOF
+    chmod +x /usr/local/bin/openwebui-ctl /usr/local/bin/webui-update 2>/dev/null || true
+    ow_ok "control tools persisted - use 'openwebui-ctl' / 'webui-update' from any login"
+  else
+    ow_ok "control tools persisted at $dst"
+    ow_info "(/usr/local/bin not writable; call 'bash $dst/openwebui-ctl' instead)"
+  fi
+}
+persist_tools
+
 # --- Done -------------------------------------------------------------------------------
 ow_step "Installation complete"
 printf '  Web UI    : %s\n' "http://127.0.0.1:${OWI_PORT}"
-printf '  Update    : %s\n' "bash ./update.sh"
-printf '  Control   : %s\n' "bash ./openwebui-ctl {start|stop|restart|status|logs|watch}"
+printf '  Update    : %s\n' "bash ./update.sh  (or: webui-update)"
+printf '  Control   : %s\n' "openwebui-ctl {start|stop|restart|status|logs|watch}"
 printf '  Logs      : %s\n' "$LOG_DIR/openwebui.log"
 printf '  Data      : %s\n' "$OWI_DATA_DIR"
 if [[ -n "${OWI_OPENAI_BASE_URL:-}" ]]; then
   printf '\n  Tip: Open WebUI is wired to your OpenAI-compatible gateway:\n'
   printf '       %s  (chat + RAG embeddings; no Ollama required)\n' "$OWI_OPENAI_BASE_URL"
-  printf '       If models do not appear, restart with: ./openwebui-ctl restart\n'
+  printf '       If models do not appear, restart with: openwebui-ctl restart\n'
 elif [[ "$INSTALL_PROFILE" == "full" || "$INSTALL_PROFILE" == "standard" ]]; then
   printf '\n  Tip: local RAG embeddings (sentence-transformers) are configured.\n'
 else

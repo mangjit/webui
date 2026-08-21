@@ -61,14 +61,14 @@ That single command does everything: Termux repos → proot-distro Ubuntu → Op
 - Manage the server later:
 
 ```bash
-# inside the Ubuntu distro (proot-distro login ubuntu)
-# NOTE: the project folder is bind-mounted from Termux; on Android the mount
-# may be noexec / lose the exec bit, so always invoke the scripts with bash:
-bash ./openwebui-ctl status     # start | stop | restart | logs | watch
-bash ./update.sh                # smart update / repair
+# from Termux, any time:
+proot-distro login ubuntu -- openwebui-ctl start      # start / stop / restart / status / logs / watch
+proot-distro login ubuntu -- openwebui-ctl status
 ```
 
-> **Why `bash ./...`?** On Android, files bind-mounted from Termux into proot can hit `Permission denied` when executed directly (noexec mount or lost exec bit — exactly the `line 1: .../install.sh: Permission denied` error). Running them through `bash` reads the file instead of execve-ing it, which works everywhere. If you prefer, `chmod +x install.sh update.sh openwebui-ctl` on the Termux side also restores direct execution where the filesystem allows it.
+The installer **persists its control tools inside the Ubuntu filesystem** (`~/.openwebui-installer/tools/`) and installs `openwebui-ctl` + `webui-update` wrappers into `/usr/local/bin`. This matters because the project folder is only **bind-mounted** from Termux for the duration of the bootstrap's login session — after it exits, `/root/openwebui-autoinstaller` no longer exists. The wrappers live in the real rootfs, so they work from any fresh login, no bind mount needed.
+
+> **Why `bash ./...` elsewhere?** During install, files bind-mounted from Termux into proot can hit `Permission denied` when executed directly (noexec mount or lost exec bit — the `line 1: .../install.sh: Permission denied` error). The bootstrap runs `bash install.sh` to avoid execve, and the persisted wrappers also exec through bash.
 
 ---
 

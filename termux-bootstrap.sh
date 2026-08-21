@@ -186,7 +186,7 @@ say "Launching installer inside $DISTRO (this can take a long time)"
 GREEN='\033[1;32m'; RESET='\033[0m'
 printf "${GREEN}  After install, access Open WebUI at http://127.0.0.1:8080${RESET}\n"
 printf "${GREEN}  (from other devices on your LAN: http://<phone-ip>:8080)${RESET}\n"
-printf "${GREEN}  Stop it later with: proot-distro login $DISTRO -- bash ./openwebui-ctl stop${RESET}\n\n"
+printf "${GREEN}  Later runs (from Termux): proot-distro login $DISTRO -- openwebui-ctl start${RESET}\n\n"
 
 # bind this folder into the distro and run the installer with device context.
 # NOTE: proot-distro (the Python rewrite and the legacy bash version alike)
@@ -214,3 +214,12 @@ proot-distro login "$DISTRO" \
   --env OWI_GPU="$GPU_HINT" \
   --env OWI_OLLAMA_MODE=auto \
   -- /bin/bash /root/openwebui-autoinstaller/install.sh "${INSTALL_ARGS[@]}"
+
+# --- Done ---------------------------------------------------------------------------
+say "Bootstrap finished"
+printf "The installer persisted its control tools inside Ubuntu (bind mount is\n"
+printf "only active during install). To run Open WebUI later, from Termux:\n\n"
+printf "  ${GREEN}termux-wake-lock${RESET}   (keep the phone alive while it runs)\n"
+printf "  ${GREEN}proot-distro login %s -- openwebui-ctl start${RESET}\n" "$DISTRO"
+printf "  ${GREEN}proot-distro login %s -- openwebui-ctl status${RESET}\n" "$DISTRO"
+printf "\nThen open http://127.0.0.1:8080  (or http://<phone-ip>:8080 on your LAN).\n"
