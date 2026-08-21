@@ -203,6 +203,25 @@ Open WebUI runtime settings live in `~/.openwebui-installer/open_webui.env`. The
 
 ---
 
+## "Startup is slow / always says data migration"
+
+That message is misleading on repeat boots — it only truly runs migrations on the **first** start. On a phone, every boot genuinely takes ~1–2 minutes because Open WebUI **imports its whole AI stack at startup** (torch, transformers, onnxruntime, chromadb…) and that import time is CPU-bound — worse inside proot.
+
+If you use OmniRoute (or any OpenAI-compatible gateway) for chat **and** embeddings, the heavy local stack is dead weight. Switch to the **light profile** — it installs without torch/transformers/onnxruntime (~2–3 GB instead of ~10+ GB) and boots in **~15–30 s** instead of 1–2 min:
+
+```bash
+# from Termux (re-run is safe: keeps your data, rebuilds the venv leaner)
+cd ~/webui && git pull
+bash termux-bootstrap.sh --openai-base-url http://127.0.0.1:20128/v1 --profile light
+```
+
+What you lose on light: on-device speech-to-text (Whisper) and local embedding models — both can be routed through OmniRoute instead (`/v1/audio/transcriptions`, `/v1/embeddings`). What you keep: everything else, including RAG through the gateway.
+
+Other small speedups already applied by the installer:
+- `ENABLE_VERSION_UPDATE_CHECK=false` — no GitHub update ping on startup
+- bytecode pre-compiled once after install (`compileall`) so imports skip compilation
+- single worker + tuned `OMP_NUM_THREADS` for the phone CPU
+
 ## What has been verified
 
 Tested end-to-end in a sandbox (x86_64, uv 0.12, Python 3.11.16, Open WebUI v0.11.0):

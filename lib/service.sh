@@ -58,8 +58,7 @@ svc_start() {
 
   ow_info "starting Open WebUI on 0.0.0.0:${port} (log: $SERVER_LOG)"
 
-  # Source the env file, then launch detached.
-  (
+  # Source the env file, then launch detached.  (
     set -a
     # shellcheck disable=SC1090
     source "$ENV_FILE"
@@ -72,9 +71,16 @@ svc_start() {
   # The subshell above must have written the pidfile; verify
   if [[ ! -s "$PID_FILE" ]]; then ow_err "failed to record service pid"; return 1; fi
 
-  ow_info "waiting for /health (first start runs database migrations; can take minutes)..."
-  if wait_healthy "$port" 120; then
-    ow_ok "Open WebUI is up: http://127.0.0.1:${port}  (pid $(svc_pid))"
+  # Distinguish a true first start (no database yet -> migrations run) from
+  # a normal start, so the user is not told "migrations" on every boot.
+  local boot_note="boot takes ~1-2 minutes on a phone (imports the AI stack) - this is normal"
+  if [[ ! -f "$OWI_DATA_DIR/webui.db" ]]; then
+    boot_note="first start: creating database + running migrations, can take a few minutes"
+  fi
+  ow_info "waiting for /health ($boot_note)..."
+  local _t0=$SECONDS
+  if wait_healthy "$port" 180; then
+    ow_ok "Open WebUI is up: http://127.0.0.1:${port}  (pid $(svc_pid), booted in $((SECONDS - _t0))s)"
     return 0
   fi
   ow_err "service did not become healthy within the timeout. Last log lines:"

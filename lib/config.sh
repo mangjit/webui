@@ -115,6 +115,9 @@ EOF
 SCARF_NO_ANALYTICS=true
 DO_NOT_TRACK=true
 ANONYMIZED_TELEMETRY=false
+# Skip the GitHub update-check ping (saves a slow network call on mobile;
+# use webui-update to check for updates instead)
+ENABLE_VERSION_UPDATE_CHECK=false
 
 # --- Platform ---
 ENABLE_PLUGINS=true

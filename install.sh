@@ -172,6 +172,17 @@ else
 fi
 verify_openwebui_installed || ow_die "installed package failed verification - run ./update.sh --repair"
 
+# Pre-compile Python bytecode (detached, best-effort): makes every later
+# start faster, because imports no longer compile on first use. A partially
+# completed pass is still beneficial, so we never block on it.
+if ! is_dry_run && [[ "${OWI_COMPILEALL:-1}" == "1" ]] && [[ -d "$VENV_DIR/lib" ]]; then
+  ow_info "pre-compiling Python bytecode in the background (one-time; speeds up every start)..."
+  (
+    SP="$(echo "$VENV_DIR"/lib/*/site-packages)"
+    [[ -d "$SP" ]] && timeout 300 "$VENV_DIR/bin/python" -m compileall -q -j 2 "$SP" >/dev/null 2>&1
+  ) &
+fi
+
 # --- Phase 4: configuration ---------------------------------------------------------
 apply_env_file
 
