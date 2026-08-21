@@ -92,9 +92,26 @@ fi
 
 # --- 3. Ubuntu distro ---------------------------------------------------------------
 say "Installing Ubuntu proot-distro ($DISTRO)"
-# Robust installed-check: proot-distro's output differs across versions
-# (legacy bash: "  ubuntu", Python rewrite: "  * ubuntu" with ANSI codes).
-if proot-distro list 2>/dev/null | grep -qE "(^|[^A-Za-z0-9_-])${DISTRO}([^A-Za-z0-9_-]|$)"; then
+
+# Version-independent installed-check. proot-distro's `list` output differs
+# across versions and wrappers (legacy bash: "  ubuntu"; Python rewrite:
+# "  * ubuntu" with ANSI codes; third-party front-ends vary further), so we
+# check the container filesystem directly instead of parsing text:
+#   new layout:  $PREFIX/var/lib/proot-distro/containers/<name>/rootfs
+#   legacy:      $PREFIX/var/lib/proot-distro/installed-rootfs/<name>
+distro_installed() {
+  local name="$1" runtime="${PROOT_DISTRO_STATE:-$PREFIX/var/lib/proot-distro}"
+  [[ -d "$runtime/containers/$name/rootfs" ]] && return 0
+  [[ -d "$runtime/installed-rootfs/$name" ]] && return 0
+  # Fallback: parse `list` output. The Python rewrite colorizes names
+  # ("  * \e[32mubuntu\e[0m") and the color code ends in 'm' (a letter),
+  # which breaks word-boundary regexes - strip ANSI codes first.
+  proot-distro list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' \
+    | grep -qiE "(^|[^A-Za-z0-9_-])${name}([^A-Za-z0-9_-]|$)"
+  return $?
+}
+
+if distro_installed "$DISTRO"; then
   ok "distro '$DISTRO' already installed"
   if [[ "$REPLACE" == "1" ]]; then
     warn "--replace: removing and reinstalling $DISTRO (this deletes its filesystem)"
@@ -102,8 +119,18 @@ if proot-distro list 2>/dev/null | grep -qE "(^|[^A-Za-z0-9_-])${DISTRO}([^A-Za-
     proot-distro install "$DISTRO" || { echo "[error] install failed" >&2; exit 1; }
   fi
 else
-  proot-distro install "$DISTRO" || { echo "[error] proot-distro install $DISTRO failed" >&2; exit 1; }
-  ok "installed $DISTRO"
+  proot-distro install "$DISTRO" || {
+    # Idempotency guard: install can fail with "container already exists"
+    # when the container filesystem is present but the list check missed it
+    # (e.g. partial state). Treat that as success and continue.
+    if distro_installed "$DISTRO"; then
+      ok "distro '$DISTRO' is already present (install reported it exists)"
+    else
+      echo "[error] proot-distro install $DISTRO failed" >&2
+      exit 1
+    fi
+  }
+  distro_installed "$DISTRO" && ok "installed $DISTRO"
 fi
 
 # --- 4. Optional: native Ollama from TUR ----------------------------------------------
