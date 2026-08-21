@@ -46,11 +46,18 @@ profile_tuning() {
 
   # Embedding engine: local sentence-transformers on capable devices,
   # Ollama/API embeddings on weak ones (avoids loading torch at runtime).
-  case "$INSTALL_PROFILE" in
-    full)   T_RAG_EMBEDDING_ENGINE="" ; T_RAG_EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2" ;;
-    standard) T_RAG_EMBEDDING_ENGINE="" ; T_RAG_EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2" ;;
-    *)      T_RAG_EMBEDDING_ENGINE="ollama" ; T_RAG_EMBEDDING_MODEL="nomic-embed-text" ;;
-  esac
+  # If an OpenAI-compatible gateway (e.g. OmniRoute) is configured, use it
+  # for embeddings too - no Ollama needed at all.
+  if [[ -n "${OWI_OPENAI_BASE_URL:-}" ]]; then
+    T_RAG_EMBEDDING_ENGINE="openai"
+    T_RAG_EMBEDDING_MODEL="${OWI_RAG_EMBEDDING_MODEL:-text-embedding-3-small}"
+  else
+    case "$INSTALL_PROFILE" in
+      full)   T_RAG_EMBEDDING_ENGINE="" ; T_RAG_EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2" ;;
+      standard) T_RAG_EMBEDDING_ENGINE="" ; T_RAG_EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2" ;;
+      *)      T_RAG_EMBEDDING_ENGINE="ollama" ; T_RAG_EMBEDDING_MODEL="nomic-embed-text" ;;
+    esac
+  fi
 
   # Background generation chores: disable on weak hardware (huge CPU savings).
   case "$INSTALL_PROFILE" in
@@ -94,6 +101,15 @@ DEFAULT_USER_ROLE=pending
 ENABLE_OLLAMA_API=true
 ENABLE_OPENAI_API=true
 OLLAMA_BASE_URL=$ollama_base
+EOF
+  if [[ -n "${OWI_OPENAI_BASE_URL:-}" ]]; then
+    cat <<EOF
+# --- Model gateway (OpenAI-compatible, e.g. OmniRoute) ---
+OPENAI_API_BASE_URL=$OWI_OPENAI_BASE_URL
+OPENAI_API_KEY=${OWI_OPENAI_API_KEY:-omni}
+EOF
+  fi
+  cat <<EOF
 
 # --- Privacy / telemetry ---
 SCARF_NO_ANALYTICS=true

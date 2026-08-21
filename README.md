@@ -30,6 +30,30 @@ What that does, in order:
 
 > **Keep Termux alive** while the server runs: install **Termux:API** and run `termux-wake-lock`. Proot processes are killed when the Android system reclaims Termux.
 
+### Using OmniRoute (or any OpenAI-compatible gateway) instead of Ollama
+
+If you already run **OmniRoute** in Termux (a self-hosted AI gateway exposing an OpenAI-compatible API at `http://localhost:20128/v1`, no API key required), you don't need Ollama at all:
+
+```bash
+cd openwebui-autoinstaller
+bash termux-bootstrap.sh --openai-base-url http://127.0.0.1:20128/v1
+```
+
+That single command does everything: Termux repos → proot-distro Ubuntu → Open WebUI install → wires Open WebUI to OmniRoute:
+
+- `OPENAI_API_BASE_URL=http://127.0.0.1:20128/v1` — chat completions, model listing, image generation, audio…
+- `OPENAI_API_KEY=omni` — placeholder; OmniRoute works without a real key (change with `--openai-api-key` if your gateway needs one)
+- `RAG_EMBEDDING_ENGINE=openai` + `RAG_EMBEDDING_MODEL=text-embedding-3-small` — **RAG embeddings also go through OmniRoute** (it exposes `/v1/embeddings`), so no local embedding model and no Ollama anywhere
+- The installer is **not** passed `--with-ollama`, so nothing Ollama-related is installed.
+
+**Requirements on your phone:**
+
+1. OmniRoute must be **running in Termux before** you start Open WebUI (it listens on `127.0.0.1:20128`; Termux and proot-distro share the same network, so `127.0.0.1` works from inside Ubuntu). Keep Termux alive with `termux-wake-lock`.
+2. Verify from inside Ubuntu: `proot-distro login ubuntu -- curl -s http://127.0.0.1:20128/v1/models`
+3. In the Open WebUI UI, models appear automatically from OmniRoute's `/v1/models`. If you ever change the gateway URL later, re-run `update.sh` with the new value or edit the managed block, or set it in **Admin Panel → Settings → Connections**.
+
+> Other OpenAI-compatible gateways (OpenRouter, LiteLLM, LM Studio server, …) work the same way — just pass their base URL with `--openai-base-url`.
+
 ### After install
 
 - Open **http://127.0.0.1:8080** in a browser on the phone (LAN access: `http://<phone-ip>:8080`).

@@ -15,10 +15,20 @@
 
 set -uo pipefail
 
+# --- help may be shown from anywhere --------------------------------------------
+if [[ "$#" -gt 0 && ( "$1" == "-h" || "$1" == "--help" ) ]]; then
+  echo "usage: bash termux-bootstrap.sh [--with-ollama] [--openai-base-url URL] [--openai-api-key KEY] [--replace]" >&2
+  echo "  --with-ollama         install native Ollama from TUR (only if you want Ollama)" >&2
+  echo "  --openai-base-url URL use an OpenAI-compatible gateway, e.g. OmniRoute:" >&2
+  echo "                        http://127.0.0.1:20128/v1  (no Ollama needed)" >&2
+  echo "  --replace             reinstall the Ubuntu proot-distro (deletes its filesystem)" >&2
+  exit 0
+fi
+
 # --- safety: we must be inside Termux ------------------------------------------
 if [[ -z "${PREFIX:-}" || ! -d "${PREFIX:-}" ]]; then
   echo "[error] This script must run inside Termux (not in a proot shell)." >&2
-  echo "        Usage: bash termux-bootstrap.sh [--with-ollama]" >&2
+  echo "        Usage: bash termux-bootstrap.sh [--with-ollama] [--openai-base-url URL]" >&2
   exit 1
 fi
 
@@ -27,13 +37,23 @@ DISTRO="${DISTRO:-ubuntu}"
 WITH_OLLAMA=0
 REPLACE=0
 
-for arg in "$@"; do
-  case "$arg" in
-    --with-ollama) WITH_OLLAMA=1 ;;
-    --replace)     REPLACE=1 ;;
-    --distro)      echo "use: DISTRO=<name> bash termux-bootstrap.sh" >&2; exit 2 ;;
-    -h|--help)     echo "usage: bash termux-bootstrap.sh [--with-ollama] [--replace]" >&2; exit 0 ;;
-    *)             echo "unknown option: $arg" >&2; exit 2 ;;
+OPENAI_BASE_URL=""
+OPENAI_API_KEY=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --with-ollama)        WITH_OLLAMA=1; shift ;;
+    --replace)            REPLACE=1; shift ;;
+    --openai-base-url)    OPENAI_BASE_URL="${2:?--openai-base-url needs a value}"; shift 2 ;;
+    --openai-api-key)     OPENAI_API_KEY="${2:?--openai-api-key needs a value}"; shift 2 ;;
+    --distro)             echo "use: DISTRO=<name> bash termux-bootstrap.sh" >&2; exit 2 ;;
+    -h|--help)
+      echo "usage: bash termux-bootstrap.sh [--with-ollama] [--openai-base-url URL] [--openai-api-key KEY] [--replace]" >&2
+      echo "  --with-ollama         install native Ollama from TUR (only if you want Ollama)" >&2
+      echo "  --openai-base-url URL use an OpenAI-compatible gateway, e.g. OmniRoute:" >&2
+      echo "                        http://127.0.0.1:20128/v1  (no Ollama needed)" >&2
+      exit 0 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
 
@@ -140,6 +160,12 @@ printf "${GREEN}  (from other devices on your LAN: http://<phone-ip>:8080)${RESE
 printf "${GREEN}  Stop it later with: proot-distro login $DISTRO -- ./openwebui-ctl stop${RESET}\n\n"
 
 # bind this folder into the distro and run the installer with device context
+INSTALL_ARGS=(--yes)
+if [[ -n "$OPENAI_BASE_URL" ]]; then
+  INSTALL_ARGS+=(--openai-base-url "$OPENAI_BASE_URL")
+  [[ -n "$OPENAI_API_KEY" ]] && INSTALL_ARGS+=(--openai-api-key "$OPENAI_API_KEY")
+  WITH_OLLAMA=0   # a gateway is configured; no Ollama needed
+fi
 proot-distro login "$DISTRO" \
   --bind "$SCRIPT_DIR:/root/openwebui-autoinstaller" \
   --env OWI_IN_PROOT=1 \
@@ -150,4 +176,4 @@ proot-distro login "$DISTRO" \
   --env OWI_SOC="$SOC" \
   --env OWI_GPU="$GPU_HINT" \
   --env OWI_OLLAMA_MODE=auto \
-  /root/openwebui-autoinstaller/install.sh --yes "$@"
+  /root/openwebui-autoinstaller/install.sh "${INSTALL_ARGS[@]}"

@@ -18,6 +18,11 @@
 #       --python <3.11|3.12>
 #       --with-extras "pkg pkg"
 #       --with-ollama / --no-ollama
+#       --openai-base-url <url>   OpenAI-compatible gateway (e.g. OmniRoute
+#                                 http://127.0.0.1:20128/v1); also used for
+#                                 RAG embeddings. No Ollama needed.
+#       --openai-api-key <key>    gateway key (default: omni / optional)
+#       --embedding-model <m>     RAG embedding model for the gateway
 #       --allow-build      permit source builds as last resort
 #       --version <x.y.z|latest>
 #       --no-service       do not start the server at the end
@@ -65,6 +70,9 @@ while [[ $# -gt 0 ]]; do
     --with-extras)     OWI_WITH_EXTRAS="${2:?--with-extras needs a value}"; shift ;;
     --with-ollama)     OWI_OLLAMA_MODE="install" ;;
     --no-ollama)       OWI_OLLAMA_MODE="none" ;;
+    --openai-base-url) OWI_OPENAI_BASE_URL="${2:?--openai-base-url needs a value}"; shift ;;
+    --openai-api-key)  OWI_OPENAI_API_KEY="${2:?--openai-api-key needs a value}"; shift ;;
+    --embedding-model) OWI_RAG_EMBEDDING_MODEL="${2:?--embedding-model needs a value}"; shift ;;
     --allow-build)     OWI_ALLOW_BUILD=1 ;;
     --version)         OWI_OPENWEBUI_VERSION="${2:?--version needs a value}"; shift ;;
     --no-service)      OWI_START_SERVICE=0 ;;
@@ -142,6 +150,9 @@ printf '  source mode : %s\n' "$SOURCE_MODE"
 printf '  install dir : %s\n' "$OWI_INSTALL_DIR"
 printf '  data dir    : %s\n' "$OWI_DATA_DIR"
 printf '  port        : %s\n' "$OWI_PORT"
+if [[ -n "${OWI_OPENAI_BASE_URL:-}" ]]; then
+  printf '  gateway     : %s (OpenAI-compatible; Ollama not required)\n' "$OWI_OPENAI_BASE_URL"
+fi
 confirm "Proceed with this plan?" || { ow_info "aborted by user"; exit 1; }
 
 # --- Phase 1: system packages ---------------------------------------------------
@@ -190,7 +201,11 @@ printf '  Update    : %s\n' "./update.sh"
 printf '  Control   : %s\n' "./openwebui-ctl {start|stop|restart|status|logs|watch}"
 printf '  Logs      : %s\n' "$LOG_DIR/openwebui.log"
 printf '  Data      : %s\n' "$OWI_DATA_DIR"
-if [[ "$INSTALL_PROFILE" == "full" || "$INSTALL_PROFILE" == "standard" ]]; then
+if [[ -n "${OWI_OPENAI_BASE_URL:-}" ]]; then
+  printf '\n  Tip: Open WebUI is wired to your OpenAI-compatible gateway:\n'
+  printf '       %s  (chat + RAG embeddings; no Ollama required)\n' "$OWI_OPENAI_BASE_URL"
+  printf '       If models do not appear, restart with: ./openwebui-ctl restart\n'
+elif [[ "$INSTALL_PROFILE" == "full" || "$INSTALL_PROFILE" == "standard" ]]; then
   printf '\n  Tip: local RAG embeddings (sentence-transformers) are configured.\n'
 else
   printf '\n  Tip: RAG embeddings are set to use Ollama (RAG_EMBEDDING_ENGINE=ollama).\n'
