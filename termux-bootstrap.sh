@@ -92,7 +92,9 @@ fi
 
 # --- 3. Ubuntu distro ---------------------------------------------------------------
 say "Installing Ubuntu proot-distro ($DISTRO)"
-if proot-distro list 2>/dev/null | grep -qE "^\s*$DISTRO\s"; then
+# Robust installed-check: proot-distro's output differs across versions
+# (legacy bash: "  ubuntu", Python rewrite: "  * ubuntu" with ANSI codes).
+if proot-distro list 2>/dev/null | grep -qE "(^|[^A-Za-z0-9_-])${DISTRO}([^A-Za-z0-9_-]|$)"; then
   ok "distro '$DISTRO' already installed"
   if [[ "$REPLACE" == "1" ]]; then
     warn "--replace: removing and reinstalling $DISTRO (this deletes its filesystem)"
@@ -159,7 +161,11 @@ printf "${GREEN}  After install, access Open WebUI at http://127.0.0.1:8080${RES
 printf "${GREEN}  (from other devices on your LAN: http://<phone-ip>:8080)${RESET}\n"
 printf "${GREEN}  Stop it later with: proot-distro login $DISTRO -- ./openwebui-ctl stop${RESET}\n\n"
 
-# bind this folder into the distro and run the installer with device context
+# bind this folder into the distro and run the installer with device context.
+# NOTE: proot-distro (the Python rewrite and the legacy bash version alike)
+# only pass a command into the container when it follows a literal '--'
+# separator; without it, flags like --yes are parsed by proot-distro itself
+# and fail with "unrecognized option".
 INSTALL_ARGS=(--yes)
 if [[ -n "$OPENAI_BASE_URL" ]]; then
   INSTALL_ARGS+=(--openai-base-url "$OPENAI_BASE_URL")
@@ -176,4 +182,4 @@ proot-distro login "$DISTRO" \
   --env OWI_SOC="$SOC" \
   --env OWI_GPU="$GPU_HINT" \
   --env OWI_OLLAMA_MODE=auto \
-  /root/openwebui-autoinstaller/install.sh "${INSTALL_ARGS[@]}"
+  -- /root/openwebui-autoinstaller/install.sh "${INSTALL_ARGS[@]}"
