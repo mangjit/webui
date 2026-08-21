@@ -62,9 +62,13 @@ That single command does everything: Termux repos → proot-distro Ubuntu → Op
 
 ```bash
 # inside the Ubuntu distro (proot-distro login ubuntu)
-./openwebui-ctl status     # start | stop | restart | logs | watch
-./update.sh                # smart update / repair
+# NOTE: the project folder is bind-mounted from Termux; on Android the mount
+# may be noexec / lose the exec bit, so always invoke the scripts with bash:
+bash ./openwebui-ctl status     # start | stop | restart | logs | watch
+bash ./update.sh                # smart update / repair
 ```
+
+> **Why `bash ./...`?** On Android, files bind-mounted from Termux into proot can hit `Permission denied` when executed directly (noexec mount or lost exec bit — exactly the `line 1: .../install.sh: Permission denied` error). Running them through `bash` reads the file instead of execve-ing it, which works everywhere. If you prefer, `chmod +x install.sh update.sh openwebui-ctl` on the Termux side also restores direct execution where the filesystem allows it.
 
 ---
 
@@ -82,7 +86,7 @@ That single command does everything: Termux repos → proot-distro Ubuntu → Op
 | Ubuntu / Proot | `/etc/os-release`, `OWI_IN_PROOT` marker | environment handling |
 | GPU | `/sys/class/kgsl/kgsl-3d0/gpu_model`, `/proc/gpu_mali`, device-tree | Adreno/Mali classification |
 
-Every probe is best-effort, falls back to `unknown`, and can be overridden with `OWI_*` environment variables. Run `./install.sh --report` (or `bash lib/detect.sh --report`) to see what was detected without installing anything.
+Every probe is best-effort, falls back to `unknown`, and can be overridden with `OWI_*` environment variables. Run `bash ./install.sh --report` (or `bash lib/detect.sh --report`) to see what was detected without installing anything.
 
 ---
 
@@ -194,7 +198,7 @@ Open WebUI runtime settings live in `~/.openwebui-installer/open_webui.env`. The
 | "Prompt is too long" | Normal — enable Context Compaction in the UI; raise the model's context length |
 | `database is locked` / slow DB | Expected on shared storage; keep SQLite on local storage, single worker (`UVICORN_WORKERS=1`, default) |
 | Server dies when Termux is backgrounded | `termux-wake-lock` (Termux:API) or `openwebui-ctl watch` |
-| Stuck after an update | `./update.sh --repair` — rebuilds venv from lock if needed |
+| Stuck after an update | `bash ./update.sh --repair` — rebuilds venv from lock if needed |
 | 32-bit ARM device | Not supported (no wheels). Use a 64-bit device or Docker on a real computer |
 
 ---

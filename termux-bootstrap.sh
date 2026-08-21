@@ -186,13 +186,17 @@ say "Launching installer inside $DISTRO (this can take a long time)"
 GREEN='\033[1;32m'; RESET='\033[0m'
 printf "${GREEN}  After install, access Open WebUI at http://127.0.0.1:8080${RESET}\n"
 printf "${GREEN}  (from other devices on your LAN: http://<phone-ip>:8080)${RESET}\n"
-printf "${GREEN}  Stop it later with: proot-distro login $DISTRO -- ./openwebui-ctl stop${RESET}\n\n"
+printf "${GREEN}  Stop it later with: proot-distro login $DISTRO -- bash ./openwebui-ctl stop${RESET}\n\n"
 
 # bind this folder into the distro and run the installer with device context.
 # NOTE: proot-distro (the Python rewrite and the legacy bash version alike)
 # only pass a command into the container when it follows a literal '--'
 # separator; without it, flags like --yes are parsed by proot-distro itself
 # and fail with "unrecognized option".
+# NOTE: exec through the bind mount can fail with "Permission denied" when
+# the host filesystem is noexec or the exec bit is not preserved; running
+# via `bash` avoids execve entirely, so always invoke the scripts with bash.
+chmod +x "$SCRIPT_DIR/install.sh" "$SCRIPT_DIR/update.sh" "$SCRIPT_DIR/openwebui-ctl" 2>/dev/null || true
 INSTALL_ARGS=(--yes)
 if [[ -n "$OPENAI_BASE_URL" ]]; then
   INSTALL_ARGS+=(--openai-base-url "$OPENAI_BASE_URL")
@@ -209,4 +213,4 @@ proot-distro login "$DISTRO" \
   --env OWI_SOC="$SOC" \
   --env OWI_GPU="$GPU_HINT" \
   --env OWI_OLLAMA_MODE=auto \
-  -- /root/openwebui-autoinstaller/install.sh "${INSTALL_ARGS[@]}"
+  -- /bin/bash /root/openwebui-autoinstaller/install.sh "${INSTALL_ARGS[@]}"

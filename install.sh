@@ -197,8 +197,8 @@ fi
 # --- Done -------------------------------------------------------------------------------
 ow_step "Installation complete"
 printf '  Web UI    : %s\n' "http://127.0.0.1:${OWI_PORT}"
-printf '  Update    : %s\n' "./update.sh"
-printf '  Control   : %s\n' "./openwebui-ctl {start|stop|restart|status|logs|watch}"
+printf '  Update    : %s\n' "bash ./update.sh"
+printf '  Control   : %s\n' "bash ./openwebui-ctl {start|stop|restart|status|logs|watch}"
 printf '  Logs      : %s\n' "$LOG_DIR/openwebui.log"
 printf '  Data      : %s\n' "$OWI_DATA_DIR"
 if [[ -n "${OWI_OPENAI_BASE_URL:-}" ]]; then
