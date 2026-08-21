@@ -34,12 +34,23 @@ sys_cmd() {
   esac
 }
 
+# Ubuntu renamed some packages (t64 transition: libmagic1 -> libmagic1t64,
+# libssl3 -> libssl3t64, ...). If the requested name is not installed but its
+# t64 counterpart is, treat it as satisfied.
+pkg_aliases() {
+  case "$1" in
+    libmagic1)   echo "libmagic1t64" ;;
+    libssl3)     echo "libssl3t64" ;;
+    *)           echo "" ;;
+  esac
+}
+
 sys_pkg_installed() {
   # sys_pkg_installed <pkg> -> 0 if installed
-  case "$HW_ENV_KIND" in
-    termux) dpkg -s "$1" >/dev/null 2>&1 ;;
-    *)      dpkg -s "$1" >/dev/null 2>&1 ;;
-  esac
+  local pkg="$1" alias
+  dpkg -s "$pkg" >/dev/null 2>&1 && return 0
+  alias="$(pkg_aliases "$pkg")"
+  [[ -n "$alias" ]] && dpkg -s "$alias" >/dev/null 2>&1
 }
 
 sys_update_once() {
@@ -99,12 +110,34 @@ install_system_packages() {
 # ---------------------------------------------------------------------------
 # uv bootstrap (astral python manager)
 # ---------------------------------------------------------------------------
+# A usable uv for this installer must be able to download & run glibc
+# CPython builds for the current environment. The Termux TUR uv is built for
+# bionic/aarch64-linux-android and CANNOT fetch Linux CPython ("No download
+# found for request: cpython-3.11-linux-aarch64-none"), so inside proot/linux
+# we must reject it and use the official astral installer instead.
+uv_platform_ok() {
+  local uv="$1" plat
+  plat="$("$uv" version --output-format json 2>/dev/null | sed -n 's/.*"version_info".*//p')"
+  if [[ -z "$plat" ]]; then
+    plat="$("$uv" --version 2>&1)"
+  fi
+  [[ "$plat" != *"aarch64-linux-android"* && "$plat" != *"linux-android"* && "$plat" != *"android"* ]]
+}
+
 ensure_uv() {
   # Discover an existing uv (PATH or the standard install dirs) first.
   local candidate
   candidate="$(command -v uv 2>/dev/null || true)"
-  if [[ -z "$candidate" && -x "$HOME/.local/bin/uv" ]]; then candidate="$HOME/.local/bin/uv"; fi
-  if [[ -z "$candidate" && -n "${XDG_BIN_HOME:-}" && -x "$XDG_BIN_HOME/uv" ]]; then candidate="$XDG_BIN_HOME/uv"; fi
+  if [[ -n "$candidate" ]] && ! uv_platform_ok "$candidate"; then
+    ow_warn "found Termux/TUR uv ($("$candidate" --version 2>/dev/null || echo '?')); it cannot manage Linux Python inside proot - using the official uv instead"
+    candidate=""
+  fi
+  if [[ -z "$candidate" && -x "$HOME/.local/bin/uv" ]] && uv_platform_ok "$HOME/.local/bin/uv"; then
+    candidate="$HOME/.local/bin/uv"
+  fi
+  if [[ -z "$candidate" && -n "${XDG_BIN_HOME:-}" && -x "$XDG_BIN_HOME/uv" ]] && uv_platform_ok "$XDG_BIN_HOME/uv"; then
+    candidate="$XDG_BIN_HOME/uv"
+  fi
   if [[ -n "$candidate" ]]; then
     UV_BIN="$candidate"
     export PATH="$(dirname "$candidate"):$PATH"
