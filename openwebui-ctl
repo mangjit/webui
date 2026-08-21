@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# ============================================================================
+# openwebui-ctl - service control for the auto-installed Open WebUI
+# (no systemd inside proot; uses nohup + pidfile)
+#
+#   openwebui-ctl start|stop|restart|status|logs [n]|watch [sec]|update
+# ============================================================================
+
+set -uo pipefail
+OWI_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+# shellcheck source=lib/common.sh
+source "$OWI_SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/service.sh
+source "$OWI_SCRIPT_DIR/lib/service.sh"
+
+cmd="${1:-status}"
+case "$cmd" in
+  start)   svc_start ;;
+  stop)    svc_stop ;;
+  restart) svc_restart ;;
+  status)  svc_status ;;
+  logs)    svc_logs "${2:-100}" ;;
+  watch)   svc_watch "${2:-30}" ;;
+  update)  exec "$OWI_SCRIPT_DIR/update.sh" --yes "${@:2}" ;;
+  info)
+    printf 'install dir : %s\n' "$OWI_INSTALL_DIR"
+    printf 'data dir    : %s\n' "$OWI_DATA_DIR"
+    printf 'env file    : %s\n' "$ENV_FILE"
+    printf 'port        : %s\n' "$OWI_PORT"
+    svc_status
+    ;;
+  *)
+    echo "usage: openwebui-ctl {start|stop|restart|status|logs [n]|watch [sec]|update|info}" >&2
+    exit 2 ;;
+esac

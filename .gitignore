@@ -1,0 +1,15 @@
+# Runtime artifacts created by the installer (never commit these)
+.env
+.env.*
+webui.secret
+state.conf
+requirements.lock
+requirements-min.txt
+requirements.txt
+*.log
+backups/
+logs/
+
+# Editor / OS noise
+.DS_Store
+*.swp
